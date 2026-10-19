@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email"]
+    },
+    "FieldObservation": {
+      "title": "FieldObservation",
+      "description": "Botanical field observation and species notes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "species": { "type": "string", "maxLength": 150 },
+        "habitatType": { "type": "string", "maxLength": 100 },
+        "locationName": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "Soundscape": {
+      "title": "Soundscape",
+      "description": "Generated ecological audio soundscape record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "prompt": { "type": "string", "maxLength": 500 },
+        "title": { "type": "string", "maxLength": 200 },
+        "audioUrl": { "type": "string", "maxLength": 2000 },
+        "modelUsed": { "type": "string", "maxLength": 100 },
+        "duration": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "prompt"]
+    },
+    "BotanicalRecord": {
+      "title": "BotanicalRecord",
+      "description": "Generated botanical image or video record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "prompt": { "type": "string", "maxLength": 1000 },
+        "mediaType": { "type": "string", "enum": ["image", "video"] },
+        "mediaUrl": { "type": "string", "maxLength": 2000 },
+        "aspectRatio": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "prompt", "mediaType"]
+    },
+    "FavoriteItem": {
+      "title": "FavoriteItem",
+      "description": "Saved favorite gallery image or specimen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "itemType": { "type": "string", "maxLength": 50 },
+        "title": { "type": "string", "maxLength": 200 },
+        "imageUrl": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "imageUrl"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Archived conversation turn with Sylva Guide",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string", "maxLength": 5000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "role", "content"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Contact form submissions from stewards and visitors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "topic": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "message"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection"
+    },
+    "/users/{userId}/observations/{observationId}": {
+      "schema": "FieldObservation",
+      "description": "User field observations"
+    },
+    "/users/{userId}/soundscapes/{soundscapeId}": {
+      "schema": "Soundscape",
+      "description": "User generated forest soundscapes"
+    },
+    "/users/{userId}/botanical_records/{recordId}": {
+      "schema": "BotanicalRecord",
+      "description": "User generated botanical imagery and videos"
+    },
+    "/users/{userId}/favorites/{favoriteId}": {
+      "schema": "FavoriteItem",
+      "description": "User saved favorites"
+    },
+    "/users/{userId}/chat_history/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "User persistent chat history"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Public contact messages submitted to Sylva"
+    }
+  }
+}

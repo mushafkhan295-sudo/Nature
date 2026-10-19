@@ -1,0 +1,159 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User profile validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email']) &&
+        data.id is string && data.id == request.auth.uid &&
+        data.email is string && data.email.size() <= 200 &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500));
+    }
+
+    // Field observation validation
+    function isValidObservation(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'title']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == userId &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+        (!('species' in data) || (data.species is string && data.species.size() <= 150)) &&
+        (!('habitatType' in data) || (data.habitatType is string && data.habitatType.size() <= 100)) &&
+        (!('locationName' in data) || (data.locationName is string && data.locationName.size() <= 200));
+    }
+
+    // Soundscape validation
+    function isValidSoundscape(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'prompt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == userId &&
+        data.prompt is string && data.prompt.size() > 0 && data.prompt.size() <= 500 &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 200)) &&
+        (!('audioUrl' in data) || (data.audioUrl is string && data.audioUrl.size() <= 2000)) &&
+        (!('modelUsed' in data) || (data.modelUsed is string && data.modelUsed.size() <= 100)) &&
+        (!('duration' in data) || data.duration is number);
+    }
+
+    // Botanical record validation
+    function isValidBotanicalRecord(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'prompt', 'mediaType']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == userId &&
+        data.prompt is string && data.prompt.size() > 0 && data.prompt.size() <= 1000 &&
+        data.mediaType in ['image', 'video'] &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 200)) &&
+        (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 2000)) &&
+        (!('aspectRatio' in data) || (data.aspectRatio is string && data.aspectRatio.size() <= 20));
+    }
+
+    // Favorite item validation
+    function isValidFavorite(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'imageUrl']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == userId &&
+        data.imageUrl is string && data.imageUrl.size() <= 2000 &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 200)) &&
+        (!('itemType' in data) || (data.itemType is string && data.itemType.size() <= 50));
+    }
+
+    // Chat message validation
+    function isValidChatMessage(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'role', 'content']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && data.userId == userId &&
+        data.role in ['user', 'assistant'] &&
+        data.content is string && data.content.size() <= 5000;
+    }
+
+    // Contact message validation (spam protection limits)
+    function isValidContactMessage(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'message']) &&
+        data.id is string && isValidId(data.id) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() > 3 && data.email.size() <= 200 &&
+        data.message is string && data.message.size() > 2 && data.message.size() <= 2000 &&
+        (!('topic' in data) || (data.topic is string && data.topic.size() <= 100));
+    }
+
+    // Contact messages: anyone can create valid message, cannot read/update/delete
+    match /contact_messages/{messageId} {
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming());
+      allow read, update, delete: if false;
+    }
+
+    // Rules for Users
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().id == existing().id;
+      allow delete: if isOwner(userId);
+
+      // Subcollection: observations
+      match /observations/{observationId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(observationId) && isValidObservation(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(observationId) && isValidObservation(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: soundscapes
+      match /soundscapes/{soundscapeId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(soundscapeId) && isValidSoundscape(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(soundscapeId) && isValidSoundscape(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: botanical_records
+      match /botanical_records/{recordId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(recordId) && isValidBotanicalRecord(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(recordId) && isValidBotanicalRecord(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: favorites
+      match /favorites/{favoriteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(favoriteId) && isValidFavorite(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(favoriteId) && isValidFavorite(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: chat_history
+      match /chat_history/{chatId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(chatId) && isValidChatMessage(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(chatId) && isValidChatMessage(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
